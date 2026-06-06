@@ -48,6 +48,7 @@ __WEAK const target_family_descriptor_t g_nxp_kinetis_kseries = {0};
 __WEAK const target_family_descriptor_t g_nxp_kinetis_lseries = {0};
 __WEAK const target_family_descriptor_t g_nxp_kinetis_vseries = {0};
 __WEAK const target_family_descriptor_t g_nxp_kinetis_k32_series = {0};
+__WEAK const target_family_descriptor_t g_nxp_s32k3_family = {0};
 __WEAK const target_family_descriptor_t g_nxp_mimxrt = {0};
 __WEAK const target_family_descriptor_t g_nxp_rapid_iot = {0};
 __WEAK const target_family_descriptor_t g_nxp_lpc55xx_series = {0};
@@ -81,6 +82,7 @@ const target_family_descriptor_t *g_families[] = {
     &g_nxp_kinetis_lseries,
     &g_nxp_kinetis_vseries,
     &g_nxp_kinetis_k32_series,
+    &g_nxp_s32k3_family,
     &g_nxp_lpc55xx_series,
     &g_nxp_mimxrt,
     &g_nxp_rapid_iot,
