@@ -1,0 +1,12 @@
+common:
+    macros:
+        # SWDIO returns on the SWDIO_OUT pin via the U11 74LVC1T45 (single
+        # bidirectional node, no dedicated SWDIO_IN pin) -- selects the
+        # shared-pin SWDIO handling in the k26f HIC DAP_config.h.
+        - BOARD_SWDIO_BIDIR
+    sources:
+        board:
+            - source/board/s32k312minievb.c
+        family:
+            - source/family/nxp/s32k3/target.c
+            - source/family/nxp/s32k3/s32k3_reset.c
