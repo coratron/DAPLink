@@ -198,6 +198,12 @@ __STATIC_INLINE void PORT_SWD_SETUP(void)
 {
     PIN_SWCLK_GPIO->PSOR     = 1 << PIN_SWCLK_BIT;
     PIN_SWDIO_OUT_GPIO->PSOR = 1 << PIN_SWDIO_OUT_BIT;
+#ifdef BOARD_SWDIO_BIDIR
+    /* On bidirectional-SWDIO boards the SWCLK/SWDIO_OUT pins idle tri-stated
+       (see DAP_SETUP); entering SWD mode re-asserts them as driven outputs. */
+    PIN_SWCLK_GPIO->PDDR |= 1 << PIN_SWCLK_BIT;
+    PIN_SWDIO_OUT_GPIO->PDDR |= 1 << PIN_SWDIO_OUT_BIT;
+#endif
     PIN_SWDIO_OE_GPIO->PSOR = 1 << PIN_SWDIO_OE_BIT;
     PIN_SWD_OE_GPIO->PSOR   = 1 << PIN_SWD_OE_BIT;
     PIN_nRESET_GPIO->PSOR    = 1 << PIN_nRESET_BIT;
@@ -213,6 +219,11 @@ Disables the DAP Hardware I/O pins which configures:
 */
 __STATIC_INLINE void PORT_OFF(void)
 {
+#ifdef BOARD_SWDIO_BIDIR
+    /* Tri-state SWCLK/SWDIO_OUT so the shared SWDIO node floats when idle. */
+    PIN_SWDIO_OUT_GPIO->PDDR &= ~(1 << PIN_SWDIO_OUT_BIT);
+    PIN_SWCLK_GPIO->PDDR &= ~(1 << PIN_SWCLK_BIT);
+#endif
     PIN_SWDIO_OE_GPIO->PCOR = 1 << PIN_SWDIO_OE_BIT;
     PIN_SWD_OE_GPIO->PCOR   = 1 << PIN_SWD_OE_BIT;
     PIN_nRESET_GPIO->PSOR    = 1 << PIN_nRESET_BIT;
@@ -251,12 +262,23 @@ __STATIC_FORCEINLINE void     PIN_SWCLK_TCK_CLR(void)
 
 // SWDIO/TMS Pin I/O --------------------------------------
 
+// Boards that route SWDIO through a single bidirectional level-shifter node
+// (target-driven SWDIO returns on the SWDIO_OUT pin itself, with no dedicated
+// SWDIO_IN pin -- e.g. the S32K312-MINI-EVB U11 74LVC1T45) define
+// BOARD_SWDIO_BIDIR. They read SWDIO back on the OUT pin and tri-state it
+// during host reads. The default (separate SWDIO_OUT/SWDIO_IN pins, e.g.
+// FRDM-K32L3A6) reads the dedicated SWDIO_IN pin and keeps OUT driven.
+
 /** SWDIO/TMS I/O pin: Get Input.
 \return Current status of the SWDIO/TMS DAP hardware I/O pin.
 */
 __STATIC_FORCEINLINE uint32_t PIN_SWDIO_TMS_IN(void)
 {
+#ifdef BOARD_SWDIO_BIDIR
+    return ((PIN_SWDIO_OUT_GPIO->PDIR >> PIN_SWDIO_OUT_BIT) & 1);
+#else
     return ((PIN_SWDIO_IN_GPIO->PDIR >> PIN_SWDIO_IN_BIT) & 1);
+#endif
 }
 
 /** SWDIO/TMS I/O pin: Set Output to High.
@@ -280,7 +302,11 @@ __STATIC_FORCEINLINE void     PIN_SWDIO_TMS_CLR(void)
 */
 __STATIC_FORCEINLINE uint32_t PIN_SWDIO_IN(void)
 {
+#ifdef BOARD_SWDIO_BIDIR
+    return (BITBAND_REG(PIN_SWDIO_OUT_GPIO->PDIR, PIN_SWDIO_OUT_BIT));
+#else
     return (BITBAND_REG(PIN_SWDIO_IN_GPIO->PDIR, PIN_SWDIO_IN_BIT));
+#endif
 }
 
 /** SWDIO I/O pin: Set Output (used in SWD mode only).
@@ -297,6 +323,9 @@ called prior \ref PIN_SWDIO_OUT function calls.
 */
 __STATIC_FORCEINLINE void     PIN_SWDIO_OUT_ENABLE(void)
 {
+#ifdef BOARD_SWDIO_BIDIR
+    PIN_SWDIO_OUT_GPIO->PDDR |= 1 << PIN_SWDIO_OUT_BIT;
+#endif
     PIN_SWDIO_OE_GPIO->PSOR = 1 << PIN_SWDIO_OE_BIT;
 }
 
@@ -306,6 +335,9 @@ called prior \ref PIN_SWDIO_IN function calls.
 */
 __STATIC_FORCEINLINE void     PIN_SWDIO_OUT_DISABLE(void)
 {
+#ifdef BOARD_SWDIO_BIDIR
+    PIN_SWDIO_OUT_GPIO->PDDR &= ~(1 << PIN_SWDIO_OUT_BIT);
+#endif
     PIN_SWDIO_OE_GPIO->PCOR = 1 << PIN_SWDIO_OE_BIT;
 }
 
@@ -468,12 +500,20 @@ __STATIC_INLINE void DAP_SETUP(void)
     PIN_SWCLK_PORT->PCR[PIN_SWCLK_BIT]         = PORT_PCR_MUX(1) |   /* GPIO */
              PORT_PCR_DSE_MASK; /* High drive strength */
     PIN_SWCLK_GPIO->PSOR  = 1 << PIN_SWCLK_BIT;                      /* High level */
+#ifdef BOARD_SWDIO_BIDIR
+    PIN_SWCLK_GPIO->PDDR &= ~(1 << PIN_SWCLK_BIT);                   /* Hi-Z until SWD mode */
+#else
     PIN_SWCLK_GPIO->PDDR |= 1 << PIN_SWCLK_BIT;                      /* Output */
+#endif
     /* Configure I/O pin SWDIO_OUT */
     PIN_SWDIO_OUT_PORT->PCR[PIN_SWDIO_OUT_BIT] = PORT_PCR_MUX(1) |   /* GPIO */
              PORT_PCR_DSE_MASK; /* High drive strength */
     PIN_SWDIO_OUT_GPIO->PSOR  = 1 << PIN_SWDIO_OUT_BIT;              /* High level */
+#ifdef BOARD_SWDIO_BIDIR
+    PIN_SWDIO_OUT_GPIO->PDDR &= ~(1 << PIN_SWDIO_OUT_BIT);           /* Hi-Z until SWD mode */
+#else
     PIN_SWDIO_OUT_GPIO->PDDR |= 1 << PIN_SWDIO_OUT_BIT;              /* Output */
+#endif
     /* Configure I/O pin SWDIO_IN */
     PIN_SWDIO_IN_PORT->PCR[PIN_SWDIO_IN_BIT]   = PORT_PCR_MUX(1)  |  /* GPIO */
             PORT_PCR_PE_MASK |  /* Pull enable */
