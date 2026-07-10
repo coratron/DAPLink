@@ -211,6 +211,8 @@ __STATIC_INLINE void PORT_SWD_SETUP(void)
     PIN_nRESET_GPIO->PSOR = PIN_nRESET;
     PIN_nRESET_GPIO->PDDR |= PIN_nRESET; //output
     PIN_nRESET_PORT->PCR[PIN_nRESET_BIT] = PORT_PCR_PS_MASK | PORT_PCR_PE_MASK | PORT_PCR_PFE_MASK | PORT_PCR_MUX(1);
+    /* Enable the reset level translator only while reset control is active. */
+    PIN_nRESET_EN_GPIO->PSOR = PIN_nRESET_EN;
 }
 
 /** Disable JTAG/SWD I/O Pins.
@@ -230,6 +232,8 @@ __STATIC_INLINE void PORT_OFF(void)
     PIN_nRESET_GPIO->PDDR &= ~PIN_nRESET; //input
     PIN_nRESET_PORT->PCR[PIN_nRESET_BIT] |= PORT_PCR_ISF_MASK;
     PIN_nRESET_PORT->PCR[PIN_nRESET_BIT] = PORT_PCR_PS_MASK | PORT_PCR_PE_MASK | PORT_PCR_PFE_MASK | PORT_PCR_MUX(1);
+    /* PTA7 is released; isolate the target reset line again. */
+    PIN_nRESET_EN_GPIO->PCOR = PIN_nRESET_EN;
 }
 
 
@@ -536,14 +540,11 @@ __STATIC_INLINE void DAP_SETUP(void)
             PORT_PCR_ODE_MASK;  /* Open-drain */
     PIN_nRESET_GPIO->PSOR  = 1 << PIN_nRESET_BIT;                    /* High level */
     PIN_nRESET_GPIO->PDDR &= ~(1 << PIN_nRESET_BIT);                    /* Input */
-    // Configure I/O pin LVLRST_EN
-    // The nRESET level translator is enabled by default. The translator is auto-
-    // direction sensing. So as long as we don't drive nRESET from our side, we won't
-    // interfere with another debug probe connected to the target SWD header.
-    PIN_nRESET_EN_PORT->PCR[PIN_nRESET_EN_BIT]       = PORT_PCR_MUX(1)  |  /* GPIO */
-            PORT_PCR_ODE_MASK;  /* Open-drain */
-    PIN_nRESET_EN_GPIO->PSOR  = PIN_nRESET_EN;                    /* High level */
+    // Configure LVLRST_EN disabled during startup. NTB0102GT OE is input-only.
+    PIN_nRESET_EN_PORT->PCR[PIN_nRESET_EN_BIT]       = PORT_PCR_MUX(1);  /* GPIO */
+    PIN_nRESET_EN_GPIO->PCOR  = PIN_nRESET_EN;                    /* Low level */
     PIN_nRESET_EN_GPIO->PDDR |= PIN_nRESET_EN;                    /* Output */
+    /* OE remains low until the reset-control port is explicitly enabled. */
     /* Configure LED */
     LED_CONNECTED_PORT->PCR[LED_CONNECTED_BIT] = PORT_PCR_MUX(1)  |  /* GPIO */
             PORT_PCR_ODE_MASK;  /* Open-drain */

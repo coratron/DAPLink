@@ -56,10 +56,9 @@ void gpio_init(void)
     // reset button configured as gpio input
     PIN_nRESET_GPIO->PDDR &= ~PIN_nRESET;
     PIN_nRESET_PORT->PCR[PIN_nRESET_BIT] = PORT_PCR_MUX(1);
-    /* Enable LVLRST_EN */
-    PIN_nRESET_EN_PORT->PCR[PIN_nRESET_EN_BIT] = PORT_PCR_MUX(1)  |  /* GPIO */
-            PORT_PCR_ODE_MASK;  /* Open-drain */
-    PIN_nRESET_EN_GPIO->PSOR  = PIN_nRESET_EN;
+    /* Keep the reset translator disabled while K26 GPIOs initialize. */
+    PIN_nRESET_EN_PORT->PCR[PIN_nRESET_EN_BIT] = PORT_PCR_MUX(1);  /* GPIO */
+    PIN_nRESET_EN_GPIO->PCOR  = PIN_nRESET_EN;
     PIN_nRESET_EN_GPIO->PDDR |= PIN_nRESET_EN;
     // Configure SWO UART RX.
     PIN_SWO_RX_PORT->PCR[PIN_SWO_RX_BIT] = PORT_PCR_MUX(3); // UART1
