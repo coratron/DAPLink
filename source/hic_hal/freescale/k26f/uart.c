@@ -37,19 +37,24 @@ static void clear_buffers(void);
 
 #define RX_OVRF_MSG         "<DAPLink:Overflow>\n"
 #define RX_OVRF_MSG_SIZE    (sizeof(RX_OVRF_MSG) - 1)
-#define BUFFER_SIZE         (512)
+#define TX_BUFFER_SIZE      (512)
+#define RX_BUFFER_SIZE      (4096)
 
 
 circ_buf_t write_buffer;
-uint8_t write_buffer_data[BUFFER_SIZE];
+uint8_t write_buffer_data[TX_BUFFER_SIZE];
 circ_buf_t read_buffer;
-uint8_t read_buffer_data[BUFFER_SIZE];
+uint8_t read_buffer_data[RX_BUFFER_SIZE];
+static volatile bool read_overflow_pending;
+static uint32_t read_overflow_msg_offset;
 
 void clear_buffers(void)
 {
     util_assert(!(UART_INSTANCE->C2 & UART_C2_TIE_MASK));
     circ_buf_init(&write_buffer, write_buffer_data, sizeof(write_buffer_data));
     circ_buf_init(&read_buffer, read_buffer_data, sizeof(read_buffer_data));
+    read_overflow_pending = false;
+    read_overflow_msg_offset = 0U;
 }
 
 int32_t uart_initialize(void)
@@ -193,7 +198,32 @@ int32_t uart_write_data(uint8_t *data, uint16_t size)
 
 int32_t uart_read_data(uint8_t *data, uint16_t size)
 {
-    return circ_buf_read(&read_buffer, data, size);
+    uint32_t count = 0;
+    cortex_int_state_t state = cortex_int_get_and_disable();
+
+    if ((read_overflow_msg_offset == 0U) && read_overflow_pending) {
+        read_overflow_pending = false;
+        read_overflow_msg_offset = 1U;
+    }
+
+    if (read_overflow_msg_offset != 0U) {
+        const uint32_t offset = read_overflow_msg_offset - 1U;
+        const uint32_t remaining = RX_OVRF_MSG_SIZE - offset;
+        const uint32_t marker_size = (size < remaining) ? size : remaining;
+        memcpy(data, &RX_OVRF_MSG[offset], marker_size);
+        count = marker_size;
+        read_overflow_msg_offset += marker_size;
+        if (read_overflow_msg_offset > RX_OVRF_MSG_SIZE) {
+            read_overflow_msg_offset = 0U;
+        }
+    }
+
+    if (count < size) {
+        count += circ_buf_read(&read_buffer, data + count, size - count);
+    }
+
+    cortex_int_restore(state);
+    return count;
 }
 
 void UART0_RX_TX_IRQHandler(void)
@@ -234,12 +264,16 @@ void UART0_RX_TX_IRQHandler(void)
 
             data = UART_INSTANCE->D;
             free = circ_buf_count_free(&read_buffer);
-            if (free > RX_OVRF_MSG_SIZE) {
+            if (free > 0U) {
                 circ_buf_push(&read_buffer, data);
-            } else if ((RX_OVRF_MSG_SIZE == free) && config_get_overflow_detect()) {
-                circ_buf_write(&read_buffer, (uint8_t*)RX_OVRF_MSG, RX_OVRF_MSG_SIZE);
             } else {
-                // Drop character
+                /* Retain the live tail of the stream. The marker is injected
+                 * by uart_read_data() after the host starts draining again. */
+                (void)circ_buf_pop(&read_buffer);
+                circ_buf_push(&read_buffer, data);
+                if (config_get_overflow_detect()) {
+                    read_overflow_pending = true;
+                }
             }
         }
     }
