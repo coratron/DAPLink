@@ -173,3 +173,10 @@ uint32_t target_get_apsel()
         return 0;
     }
 }
+
+void target_debug_disconnect(void)
+{
+    if (g_target_family && g_target_family->target_debug_disconnect) {
+        g_target_family->target_debug_disconnect();
+    }
+}

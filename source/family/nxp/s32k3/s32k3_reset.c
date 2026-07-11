@@ -35,6 +35,7 @@
 
 #define S32K3_SDA_AP_DBGENCTRL_ENABLE_M7    0x300000F0U
 #define S32K3_MDMAPCTL_ENABLE_CM7_0_ACCESS  0x00430000U
+#define S32K3_MDMAPCTL_RELEASE_CM7           0x00400000U
 #define S32K3_SDA_AP_RSTCTRL_HOLD_CM7_0     0x00000000U
 #define S32K3_SDA_AP_RSTCTRL_RELEASE_CM7_0  0x02000000U
 
@@ -88,6 +89,15 @@ static uint8_t s32k3_target_unlock_sequence(void)
     return 1U;
 }
 
+/* Match the S32K3 DFP FunctionalReset sequence's final MDMAPCTL write. Leaving
+ * CM7_x_CORE_ACCESS asserted (0x00430000) makes a later hardware nRESET enter
+ * the debug-latched boot path. Clear those requests while retaining the CM7
+ * reset-release bits before CMSIS-DAP turns the SWD pins off. */
+static void s32k3_target_debug_disconnect(void)
+{
+    (void)s32k3_write_ap_raw(S32K3_MDM_AP, S32K3_MDMAPCTL, S32K3_MDMAPCTL_RELEASE_CM7);
+}
+
 const target_family_descriptor_t g_nxp_s32k3_family = {
     .family_id              = kNXP_S32K3_FamilyID,
     /* Software (SYSRESETREQ) reset, not hardware nRESET: an nRESET wipes the
@@ -97,6 +107,7 @@ const target_family_descriptor_t g_nxp_s32k3_family = {
     .default_reset_type     = kSoftwareReset,
     .soft_reset_type        = SYSRESETREQ,
     .target_unlock_sequence = s32k3_target_unlock_sequence,
+    .target_debug_disconnect = s32k3_target_debug_disconnect,
     /* No custom target_set_state: the generic swd_set_target_state_hw() halts
      * and flashes through this AP, which must be the CM7_0 AHB-AP (#4). */
     .apsel                  = ((uint32_t)S32K3_CM7_0_AHB_AP << 24),

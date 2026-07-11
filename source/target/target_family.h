@@ -118,6 +118,7 @@ typedef struct target_family_descriptor {
     void (*target_before_init_debug)(void);     /*!< Target dependant function before debug initialization */
     void (*prerun_target_config)(void);         /*!< Target specific initialization */
     uint8_t (*target_unlock_sequence)(void);    /*!< Unlock targets that can enter lock state */
+    void (*target_debug_disconnect)(void);      /*!< Restore target run state before CMSIS-DAP disconnect */
     uint8_t (*security_bits_set)(uint32_t addr, uint8_t *data, uint32_t size);  /*!< Check security bits in the programmable flash region */
     uint8_t (*target_set_state)(target_state_t state);      /*!< Families can customize target debug states */
     void (*swd_set_target_reset)(uint8_t asserted);         /*!< Families can customize how to send reset to the target */
@@ -149,6 +150,9 @@ void swd_set_target_reset(uint8_t asserted);
 
 //! @brief Get the APSEL for the AHB-AP to use for controlling the target.
 uint32_t target_get_apsel(void);
+
+//! @brief Run target-family cleanup before the CMSIS-DAP port is disabled.
+void target_debug_disconnect(void);
 
 #ifdef __cplusplus
 }

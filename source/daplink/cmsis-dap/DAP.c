@@ -35,6 +35,7 @@
 #include "DAP.h"
 #include "info.h"
 #include "dap_strings.h"
+#include "target_family.h"
 
 
 #if (DAP_PACKET_SIZE < 64U)
@@ -263,6 +264,7 @@ static uint32_t DAP_Connect(const uint8_t *request, uint8_t *response) {
 //   return:   number of bytes in response
 static uint32_t DAP_Disconnect(uint8_t *response) {
 
+  target_debug_disconnect();
   DAP_Data.debug_port = DAP_PORT_DISABLED;
   PORT_OFF();
 
